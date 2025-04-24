@@ -3,7 +3,6 @@ import numpy as np
 from stl import mesh
 import open3d as o3d
 from transformers import pipeline
-import matplotlib.pyplot as plt
 
 
 def get_depth_map_transformer(image_path):
@@ -31,15 +30,6 @@ def create_watertight_and_smoothed_mesh(
     global_edges = cv2.Canny(gray_uint8, 50, 150)
     global_edges_dilated = cv2.dilate(global_edges, np.ones((3, 3), np.uint8), iterations=1) / 255.0
 
-    # plot for global edges and dilated global edges
-    plt.imshow(global_edges, cmap='gray')
-    plt.title("Global Edges")
-    plt.axis('off')
-    plt.show()
-    plt.imshow(global_edges_dilated, cmap='gray')
-    plt.title("Dilated Global Edges")
-    plt.axis('off')
-    plt.show()
 
     # the final height map
     height_map = (
