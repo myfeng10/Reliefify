@@ -17,74 +17,30 @@ def get_depth_map_transformer(image_path):
     normalized_depth = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
     return normalized_depth, img
 
-def fill_inner_area_from_edges(edge_img):
-    kernel = np.ones((5, 5), np.uint8)
-    closed_edges = cv2.morphologyEx(edge_img, cv2.MORPH_CLOSE, kernel)
-    contours, _ = cv2.findContours(closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    filled_mask = np.zeros_like(edge_img)
-    cv2.drawContours(filled_mask, contours, -1, 255, thickness=cv2.FILLED)
-    return filled_mask
-
-
-
-def compute_detail_map(normalized_depth, img, depth_layer=12):
-    gray_img = np.mean(img, axis=2).astype(np.uint8)
-    global_edges = cv2.Canny(gray_img, 50, 150)
-    partition_thresholds = np.linspace(0, 1, depth_layer + 1) ** 2
-    detail_map = []
-    for i in range(depth_layer):
-        layer_mask = (normalized_depth >= partition_thresholds[i]) & (normalized_depth < partition_thresholds[i+1])
-        layer_detail_edge = np.zeros_like(global_edges, dtype=np.float32)
-        layer_detail_edge[layer_mask] = global_edges[layer_mask] / 255.0
-        detail_map.append(layer_detail_edge)
-        if i == 10:
-  
-            plt.imshow(layer_detail_edge, cmap='gray')
-            plt.title("Edge outlines at depth layer 10")
-            plt.axis('off')
-            # plt.show()
-
-            masked_depth_map = np.full_like(normalized_depth, np.nan)
-            masked_depth_map[layer_mask] = normalized_depth[layer_mask]
-
-            # Show depth values in original positions with colors mapped by value
-            plt.imshow(masked_depth_map, cmap='plasma')
-            plt.title("Relative Depth Visualization at Depth Layer 10")
-            plt.axis('off')
-            plt.colorbar(label='Normalized Depth')
-            # plt.show()
-            
-    combined_detail_map = np.sum(np.array(detail_map), axis=0)
-     # For visualization:
-    plt.imshow(combined_detail_map, cmap='gray')
-    plt.title("Combined Filled Edge Regions Across All Depth Layers")
-    plt.axis('off')
-    # plt.show()
-    return combined_detail_map
-
 
 def create_watertight_and_smoothed_mesh(
     normalized_depth, img,
-    scale, base_thickness, detail_scale, grayscale_detail_weight,
+    scale, base_thickness, grayscale_detail_weight,
     stl_filename="model.stl",
     smooth_type="none",
     smooth_iters=12
 
 ):
     H, W = normalized_depth.shape
-    detail_map = compute_detail_map(normalized_depth, img)
+
+    # adding detail by grayscale
     gray_img = np.mean(img, axis=2).astype(np.float32) / 255.0
     gray_img = cv2.GaussianBlur(gray_img, (3, 3), 2)
     gray_detail_scaled = gray_img * grayscale_detail_weight
-    filled_global = fill_inner_area_from_edges(cv2.Canny(gray_img.astype(np.uint8) * 255, 50, 150)) / 255.0
+
+    # adding detail by edge detection  
     global_edges_dilated = cv2.dilate(cv2.Canny(gray_img.astype(np.uint8) * 255, 50, 150), np.ones((3, 3), np.uint8), iterations=1) / 255.0
 
-    #Test This More
+
     height_map = (
-        cv2.GaussianBlur(normalized_depth, (5, 5), 1.5) * scale +
-        filled_global * detail_scale +
-        global_edges_dilated * 1.0 +
-        gray_detail_scaled + detail_map
+        normalized_depth * scale +
+        global_edges_dilated +
+        gray_detail_scaled 
     )
 
     xx, yy = np.meshgrid(np.arange(W), np.arange(H))
@@ -166,8 +122,7 @@ def generate_printable_model(
     image_path, smooth_iters, scale=150, base_thickness=8,
     detail_scale=5, grayscale_detail_weight=5,
     stl_filename="output.stl",
-    smooth_type="smooth",
-    
+    smooth_type="default",
 ):
     normalized_depth, img = get_depth_map_transformer(image_path)
     create_watertight_and_smoothed_mesh(
@@ -181,9 +136,9 @@ def generate_printable_model(
 
 smooth_iters = 100
 generate_printable_model(
-    "image/baseline/3dbenchy.png",
+    "image/baseline/girl_figure.png",
      scale=100, base_thickness=10,
      detail_scale=10, grayscale_detail_weight=8,
      smooth_iters=smooth_iters,
-     stl_filename="model/dev/3dbenchy"+str(smooth_iters)+"1.stl",
+     stl_filename="model/dev/girl_figure"+str(smooth_iters)+"1.stl",
 )
