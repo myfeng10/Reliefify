@@ -27,16 +27,16 @@ def create_watertight_and_smoothed_mesh(
     # adding detail by grayscale
     gray_img = np.mean(img, axis=2).astype(np.float32) / 255.0
     gray_img = cv2.GaussianBlur(gray_img, (3, 3), 2)
-    gray_detail_scaled = gray_img * grayscale_detail_weight
 
     # adding detail by edge detection  
-    global_edges_dilated = cv2.dilate(cv2.Canny(gray_img.astype(np.uint8) * 255, 50, 150), np.ones((3, 3), np.uint8), iterations=1) / 255.0
+    global_edges = cv2.Canny(gray_img.astype(np.uint8) * 255, 50, 150)
+    global_edges_dilated = cv2.dilate(global_edges, np.ones((3, 3), np.uint8), iterations=1) / 255.0
 
 
     height_map = (
         normalized_depth * scale +
         global_edges_dilated +
-        gray_detail_scaled 
+        gray_img * grayscale_detail_weight 
     )
 
     xx, yy = np.meshgrid(np.arange(W), np.arange(H))
