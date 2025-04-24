@@ -1,11 +1,7 @@
 import cv2
-import torch
-import urllib.request
-import ssl
 import numpy as np
 from stl import mesh
 import open3d as o3d
-import matplotlib.pyplot as plt
 from transformers import pipeline
 
 
