@@ -3,9 +3,11 @@ import numpy as np
 from stl import mesh
 import open3d as o3d
 from transformers import pipeline
+import matplotlib.pyplot as plt
 
 
 def get_depth_map_transformer(image_path):
+    # https://huggingface.co/Intel/dpt-large
     img = cv2.imread(image_path)
     estimator = pipeline(task="depth-estimation", model="Intel/dpt-large")
     result = estimator(images=image_path)
@@ -25,9 +27,19 @@ def create_watertight_and_smoothed_mesh(
     gray_img = cv2.GaussianBlur(gray_img, (3, 3), 2)
 
     # adding detail by edge detection  
-    global_edges = cv2.Canny(gray_img.astype(np.uint8) * 255, 50, 150)
+    gray_uint8 = (gray_img * 255).astype(np.uint8)
+    global_edges = cv2.Canny(gray_uint8, 50, 150)
     global_edges_dilated = cv2.dilate(global_edges, np.ones((3, 3), np.uint8), iterations=1) / 255.0
 
+    # plot for global edges and dilated global edges
+    plt.imshow(global_edges, cmap='gray')
+    plt.title("Global Edges")
+    plt.axis('off')
+    plt.show()
+    plt.imshow(global_edges_dilated, cmap='gray')
+    plt.title("Dilated Global Edges")
+    plt.axis('off')
+    plt.show()
 
     # the final height map
     height_map = (
@@ -130,11 +142,11 @@ def generate_printable_model(
 
 
 generate_printable_model(
-    "image/baseline/girl_figure.png",
+    "image/custom/dad_sculpture.png",
     depth_scale=100,    
     grayscale_detail_weight=10,
     base_thickness=10,
     smooth_iters=10,
-    stl_filename="model/dev/girl_figure.stl",
+    stl_filename="model/dev/dad_sculpture.stl",
     smooth_type="smooth"
 )
