@@ -42,7 +42,7 @@ def compute_detail_map(normalized_depth, img, depth_layer=12):
             plt.imshow(layer_detail_edge, cmap='gray')
             plt.title("Edge outlines at depth layer 10")
             plt.axis('off')
-            plt.show()
+            # plt.show()
 
             masked_depth_map = np.full_like(normalized_depth, np.nan)
             masked_depth_map[layer_mask] = normalized_depth[layer_mask]
@@ -52,14 +52,14 @@ def compute_detail_map(normalized_depth, img, depth_layer=12):
             plt.title("Relative Depth Visualization at Depth Layer 10")
             plt.axis('off')
             plt.colorbar(label='Normalized Depth')
-            plt.show()
+            # plt.show()
             
     combined_detail_map = np.sum(np.array(detail_map), axis=0)
      # For visualization:
     plt.imshow(combined_detail_map, cmap='gray')
     plt.title("Combined Filled Edge Regions Across All Depth Layers")
     plt.axis('off')
-    plt.show()
+    # plt.show()
     return combined_detail_map
 
 
