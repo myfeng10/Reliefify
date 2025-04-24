@@ -106,7 +106,6 @@ def create_watertight_and_smoothed_mesh(
 
         # smooth the mesh
         mesh_o3d = mesh_o3d.filter_smooth_laplacian(number_of_iterations=smooth_iters)
-        mesh_o3d = mesh_o3d.filter_smooth_taubin(number_of_iterations=smooth_iters)
 
         # compute the normals
         mesh_o3d.compute_triangle_normals()
