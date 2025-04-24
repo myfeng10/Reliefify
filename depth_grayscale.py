@@ -1,10 +1,12 @@
 import cv2
+import torch
+import urllib.request
+import ssl
 import numpy as np
 from stl import mesh
-from transformers import pipeline
-import trimesh
-# from skimage.restoration import denoise_tv_chambolle
 import open3d as o3d
+import matplotlib.pyplot as plt
+from transformers import pipeline
 
 
 def get_depth_map_transformer(image_path):
@@ -23,6 +25,8 @@ def fill_inner_area_from_edges(edge_img):
     cv2.drawContours(filled_mask, contours, -1, 255, thickness=cv2.FILLED)
     return filled_mask
 
+
+
 def compute_detail_map(normalized_depth, img, depth_layer=12):
     gray_img = np.mean(img, axis=2).astype(np.uint8)
     global_edges = cv2.Canny(gray_img, 50, 150)
@@ -33,16 +37,39 @@ def compute_detail_map(normalized_depth, img, depth_layer=12):
         layer_detail_edge = np.zeros_like(global_edges, dtype=np.float32)
         layer_detail_edge[layer_mask] = global_edges[layer_mask] / 255.0
         detail_map.append(layer_detail_edge)
+        if i == 10:
+  
+            plt.imshow(layer_detail_edge, cmap='gray')
+            plt.title("Edge outlines at depth layer 10")
+            plt.axis('off')
+            plt.show()
+
+            masked_depth_map = np.full_like(normalized_depth, np.nan)
+            masked_depth_map[layer_mask] = normalized_depth[layer_mask]
+
+            # Show depth values in original positions with colors mapped by value
+            plt.imshow(masked_depth_map, cmap='plasma')
+            plt.title("Relative Depth Visualization at Depth Layer 10")
+            plt.axis('off')
+            plt.colorbar(label='Normalized Depth')
+            plt.show()
+            
     combined_detail_map = np.sum(np.array(detail_map), axis=0)
+     # For visualization:
+    plt.imshow(combined_detail_map, cmap='gray')
+    plt.title("Combined Filled Edge Regions Across All Depth Layers")
+    plt.axis('off')
+    plt.show()
     return combined_detail_map
+
 
 def create_watertight_and_smoothed_mesh(
     normalized_depth, img,
     scale, base_thickness, detail_scale, grayscale_detail_weight,
     stl_filename="model.stl",
-    smooth_iters=15,
-    lamb=0.5,            # positive smoothing factor
-    mu=-0.53            # negative “reverse” factor to prevent shrinkage
+    smooth_type="none",
+    smooth_iters=12
+
 ):
     H, W = normalized_depth.shape
     detail_map = compute_detail_map(normalized_depth, img)
@@ -114,49 +141,49 @@ def create_watertight_and_smoothed_mesh(
         faces.append([v_top1, v_top2, v_bot1])
         faces.append([v_top2, v_bot2, v_bot1])
 
-    stl_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
-    stl_mesh.vectors = vertices[np.array(faces)]
-    stl_mesh.save(stl_filename)
-    print(f"Successfully generated STL: {stl_filename}")
+    if smooth_type == "none":
+        stl_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
+        stl_mesh.vectors = vertices[np.array(faces)]
+        stl_mesh.save(stl_filename)
+        print(f"Successfully generated STL: {stl_filename}")
+    elif smooth_type == "smooth":
+
+        mesh_o3d = o3d.geometry.TriangleMesh(
+        o3d.utility.Vector3dVector(vertices),
+        o3d.utility.Vector3iVector(faces))
 
 
+        mesh_o3d = mesh_o3d.filter_smooth_taubin(number_of_iterations=smooth_iters)
 
-    # mesh_o3d = o3d.geometry.TriangleMesh(
-    # o3d.utility.Vector3dVector(vertices),
-    # o3d.utility.Vector3iVector(faces))
+        mesh_o3d.compute_triangle_normals()
+        mesh_o3d.compute_vertex_normals()
 
-    #     # 1) Laplacian
-    # mesh_o3d = mesh_o3d.filter_smooth_laplacian(number_of_iterations=10)
+        # export back to STL
+        o3d.io.write_triangle_mesh(stl_filename, mesh_o3d)
 
-    # # 2) Taubin (volume‑preserving)
-    # mesh_o3d = mesh_o3d.filter_smooth_taubin(number_of_iterations=10)
 
-    # # --- ADD THESE TWO LINES ---
-    # mesh_o3d.compute_triangle_normals()
-    # mesh_o3d.compute_vertex_normals()
-
-    # # export back to STL
-    # o3d.io.write_triangle_mesh(stl_filename, mesh_o3d)
-    
 def generate_printable_model(
-    image_path, scale=150, base_thickness=8,
+    image_path, smooth_iters, scale=150, base_thickness=8,
     detail_scale=5, grayscale_detail_weight=5,
     stl_filename="output.stl",
-    smooth_iters=15
+    smooth_type="smooth",
+    
 ):
     normalized_depth, img = get_depth_map_transformer(image_path)
     create_watertight_and_smoothed_mesh(
         normalized_depth, img, scale, base_thickness,
         detail_scale, grayscale_detail_weight,
         stl_filename,
+        smooth_type=smooth_type,
         smooth_iters=smooth_iters
     )
 
-# Example call
+
+smooth_iters = 100
 generate_printable_model(
-    "image/cat/cat_ai.png",
+    "image/baseline/3dbenchy.png",
      scale=100, base_thickness=10,
      detail_scale=10, grayscale_detail_weight=8,
-     stl_filename="model/baseline/cat_ai.stl",
-     smooth_iters=12
+     smooth_iters=smooth_iters,
+     stl_filename="model/dev/3dbenchy"+str(smooth_iters)+"1.stl",
 )
