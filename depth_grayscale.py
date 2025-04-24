@@ -105,6 +105,7 @@ def create_watertight_and_smoothed_mesh(
         o3d.utility.Vector3iVector(faces))
 
         # smooth the mesh
+        mesh_o3d = mesh_o3d.filter_smooth_laplacian(number_of_iterations=smooth_iters)
         mesh_o3d = mesh_o3d.filter_smooth_taubin(number_of_iterations=smooth_iters)
 
         # compute the normals
@@ -129,13 +130,12 @@ def generate_printable_model(
     )
 
 
-smooth_iters = 100
 generate_printable_model(
     "image/baseline/girl_figure.png",
     depth_scale=100,    
     grayscale_detail_weight=10,
     base_thickness=10,
-    smooth_iters=smooth_iters,
-    stl_filename="model/dev/girl_figure"+str(smooth_iters)+"1.stl",
+    smooth_iters=10,
+    stl_filename="model/dev/girl_figure.stl",
     smooth_type="smooth"
 )
