@@ -15,12 +15,8 @@ def get_depth_map_transformer(image_path):
 
 
 def create_watertight_and_smoothed_mesh(
-    normalized_depth, img,
-    scale, base_thickness, grayscale_detail_weight,
-    stl_filename="model.stl",
-    smooth_type="none",
-    smooth_iters=12
-
+    normalized_depth, img, depth_scale, base_thickness, grayscale_detail_weight,
+    stl_filename, smooth_type, smooth_iters
 ):
     H, W = normalized_depth.shape
 
@@ -33,12 +29,14 @@ def create_watertight_and_smoothed_mesh(
     global_edges_dilated = cv2.dilate(global_edges, np.ones((3, 3), np.uint8), iterations=1) / 255.0
 
 
+    # the final height map
     height_map = (
-        normalized_depth * scale +
+        normalized_depth * depth_scale +
         global_edges_dilated +
         gray_img * grayscale_detail_weight 
     )
 
+    # create the vertices and faces of the mesh
     xx, yy = np.meshgrid(np.arange(W), np.arange(H))
     z_top = height_map.astype(int)
     z_bottom = np.full_like(z_top, -base_thickness)
@@ -93,6 +91,7 @@ def create_watertight_and_smoothed_mesh(
         faces.append([v_top1, v_top2, v_bot1])
         faces.append([v_top2, v_bot2, v_bot1])
 
+
     if smooth_type == "none":
         stl_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
         stl_mesh.vectors = vertices[np.array(faces)]
@@ -100,41 +99,43 @@ def create_watertight_and_smoothed_mesh(
         print(f"Successfully generated STL: {stl_filename}")
     elif smooth_type == "smooth":
 
+        # create the mesh
         mesh_o3d = o3d.geometry.TriangleMesh(
         o3d.utility.Vector3dVector(vertices),
         o3d.utility.Vector3iVector(faces))
 
-
+        # smooth the mesh
         mesh_o3d = mesh_o3d.filter_smooth_taubin(number_of_iterations=smooth_iters)
 
+        # compute the normals
         mesh_o3d.compute_triangle_normals()
         mesh_o3d.compute_vertex_normals()
 
-        # export back to STL
+        # save the mesh
         o3d.io.write_triangle_mesh(stl_filename, mesh_o3d)
 
 
 def generate_printable_model(
-    image_path, smooth_iters, scale=150, base_thickness=8,
-    detail_scale=5, grayscale_detail_weight=5,
-    stl_filename="output.stl",
-    smooth_type="default",
+    image_path, depth_scale ,grayscale_detail_weight, base_thickness, smooth_iters,
+    stl_filename,
+    smooth_type,
 ):
     normalized_depth, img = get_depth_map_transformer(image_path)
     create_watertight_and_smoothed_mesh(
-        normalized_depth, img, scale, base_thickness,
-        detail_scale, grayscale_detail_weight,
+        normalized_depth, img, depth_scale, base_thickness, grayscale_detail_weight,
         stl_filename,
-        smooth_type=smooth_type,
-        smooth_iters=smooth_iters
+        smooth_type,
+        smooth_iters
     )
 
 
 smooth_iters = 100
 generate_printable_model(
     "image/baseline/girl_figure.png",
-     scale=100, base_thickness=10,
-     detail_scale=10, grayscale_detail_weight=8,
-     smooth_iters=smooth_iters,
-     stl_filename="model/dev/girl_figure"+str(smooth_iters)+"1.stl",
+    depth_scale=100,    
+    grayscale_detail_weight=10,
+    base_thickness=10,
+    smooth_iters=smooth_iters,
+    stl_filename="model/dev/girl_figure"+str(smooth_iters)+"1.stl",
+    smooth_type="smooth"
 )
